@@ -1,0 +1,23 @@
+name: Docker Compose smoke
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: mkdir -p data results .state
+      - run: docker compose config --quiet
+      - run: docker compose up -d --build --wait --wait-timeout 120
+      - run: docker compose exec -T worker python -m tools.mcp_smoke
+      - run: python -m tools.docker_smoke
+      - run: docker compose exec -T worker python -m ruff check .
+      - if: failure()
+        run: docker compose logs --no-color
+      - if: always()
+        run: docker compose down -v

@@ -1,0 +1,2 @@
+# CPU rule evaluation, CLI and local panel
+numpy>=1.26,<3

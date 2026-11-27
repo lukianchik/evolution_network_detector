@@ -1,0 +1,5 @@
+{"failed_logins":2,"connections_per_minute":12,"unique_ports":2,"outbound_mb":3.8,"interval_std":6.5,"risky_port":0}
+{"failed_logins":18,"connections_per_minute":95,"unique_ports":4,"outbound_mb":2.1,"interval_std":2.2,"risky_port":0}
+{"failed_logins":0,"connections_per_minute":125,"unique_ports":52,"outbound_mb":1.8,"interval_std":1.8,"risky_port":0}
+{"failed_logins":0,"connections_per_minute":24,"unique_ports":3,"outbound_mb":250,"interval_std":3.6,"risky_port":1}
+{"failed_logins":1,"connections_per_minute":25,"unique_ports":3,"outbound_mb":12,"interval_std":0.1,"risky_port":1}

@@ -1,0 +1,26 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-mcp.txt ruff
+      - run: python -m ruff check .
+      - run: python -m unittest discover -s tests
+      - run: python -m tools.mcp_smoke
+      - run: python -m search.local_evolution --mode local --dataset synthetic --seed 42 --generations 2 --offspring 5 --no-mcp --output results/smoke
+      - run: python -m evaluation.final_test --run results/smoke
+      - run: python -m evaluation.classify --run results/smoke
+      - run: python -m tools.benchmark --modes local hybrid --seeds 42 43 --generations 1 --offspring 3 --llm-budget 0 --final --output results/benchmark-smoke

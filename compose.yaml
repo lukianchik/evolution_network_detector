@@ -1,0 +1,108 @@
+services:
+  web:
+    image: nginx:stable-alpine
+    user: "101:101"
+    entrypoint: [nginx, -g, "daemon off;"]
+    ports:
+      - "127.0.0.1:${EVO_WEB_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/nginx-main.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      worker:
+        condition: service_healthy
+    networks: [frontend]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/api/config"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  worker:
+    image: network-evolution-worker:1.0.0
+    build:
+      context: .
+      target: worker
+      args:
+        INSTALL_SHINKA: ${INSTALL_SHINKA:-0}
+    environment:
+      EVO_CONTAINER: "1"
+      EVO_WEB_PORT: ${EVO_WEB_PORT:-8080}
+      EVO_MCP_URL: http://metrics:8090/mcp
+      EVO_METRICS_TRAIN: /app/metrics-data/UNSW_NB15_training-set.csv
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_RPM: ${GROQ_RPM:-25}
+      GROQ_RPD: ${GROQ_RPD:-900}
+      GROQ_TPM: ${GROQ_TPM:-7000}
+      GROQ_TPD: ${GROQ_TPD:-180000}
+      GROQ_MAX_WAIT: ${GROQ_MAX_WAIT:-20}
+      NO_PROXY: "localhost,127.0.0.1,metrics,${NO_PROXY:-},${no_proxy:-}"
+      no_proxy: "localhost,127.0.0.1,metrics,${NO_PROXY:-},${no_proxy:-}"
+    volumes:
+      - ./data:/app/data:ro
+      - results:/app/results
+      - state:/app/.state
+      - metrics-train:/app/metrics-data
+    networks: [frontend, backend]
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 4g
+    cpus: ${EVO_WORKER_CPUS:-2.0}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/config', timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      metrics:
+        condition: service_healthy
+    restart: unless-stopped
+  metrics:
+    image: network-evolution-metrics:1.0.0
+    build:
+      context: .
+      target: metrics
+    environment:
+      EVO_UNSW_TRAIN: /app/metrics-data/UNSW_NB15_training-set.csv
+    volumes:
+      - metrics-train:/app/metrics-data:ro
+      - results:/app/results:ro
+    networks: [backend]
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      test: [CMD, python, -c, "import socket; socket.create_connection(('127.0.0.1',8090),3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  migrate:
+    image: network-evolution-worker:1.0.0
+    profiles: [migration]
+    command: [python, -m, tools.migrate_docker]
+    network_mode: none
+    volumes:
+      - ./results:/legacy/results:ro
+      - ./.state:/legacy/state:ro
+      - results:/app/results
+      - state:/app/.state
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+networks:
+  frontend: {}
+  backend:
+    internal: true
+volumes:
+  results: {}
+  state: {}
+  metrics-train: {}
